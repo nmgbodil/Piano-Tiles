@@ -206,6 +206,7 @@ void spi1_dma_display2(const char *str)
 int score = 0;
 char disp1[17] = "                ";
 char disp2[17] = "                ";
+char score_str[6];
 volatile int pos = 0;
 void TIM17_IRQHandler(void)
 {
@@ -275,45 +276,62 @@ void init_spi1(void);
 void spi1_init_oled(void);
 void spi1_setup_dma(void);
 void spi1_enable_dma(void);
+int increment_score(void);
 
 void game(void)
 {
-    print("Score  0");
+    // char* disp1_ = malloc(sizeof(char) * 17);
+    // char* disp2_ = malloc(sizeof(char) * 17);
+    // print("Score  0");
     init_spi2();
     spi2_setup_dma();
     spi2_enable_dma();
-    spi1_dma_display1("Hit key to play");
-    spi1_dma_display2("Hit A/B to move");
+    spi1_dma_display1("Hello!");
+    spi1_dma_display2("Pick Mode: A B C");
     init_spi1();
     spi1_init_oled();
     spi1_setup_dma();
     spi1_enable_dma();
-    init_tim17(); // start timer
-    get_keypress(); // Wait for key to start
-    spi1_dma_display1(">               ");
-    spi1_dma_display2("                ");
+    // init_tim17(); // start timer
+    // get_keypress(); // Wait for key to start
+    // spi1_dma_display1(">               ");
+    // spi1_dma_display2("                ");
     // Use the timer counter as random seed...
-    srandom(TIM17->CNT);
+    // srandom(TIM17->CNT);
     // Then enable interrupt...
-    NVIC->ISER[0] = 1<<TIM17_IRQn;
+    // NVIC->ISER[0] = 1<<TIM17_IRQn;
+    int start = 1;
     for(;;) {
         char key = get_keypress();
-        if (key == 'A' || key == 'B') {
+        if (start && (key == 'A' || key == 'B' || key == 'C')) {
             // If the A or B key is pressed, disable interrupts while
             // we update the display.
-            asm("cpsid i");
+            // asm("cpsid i");
+            // pos = 0;
             if (key == 'A') {
-                pos = 0;
-                disp1[0] = '>';
-                disp2[0] = ' ';
-            } else {
-                pos = 1;
-                disp1[0] = ' ';
-                disp2[0] = '>';
+                spi1_dma_display1("Mode: Easy");
             }
-            spi1_dma_display1(disp1);
-            spi1_dma_display2(disp2);
-            asm("cpsie i");
+            else if (key == 'B') {
+                spi1_dma_display1("Mode: Medium");
+            }
+            else {
+                spi1_dma_display1("Mode: Hard");
+            }
+            spi1_dma_display2("Score: 0");
+            start = 0;
+
+            // asm("cpsie i");
         }
+        else {
+            score += increment_score();
+            sprintf(score_str, "%d", score);
+            strcat(disp2, score_str);
+            spi1_dma_display2(disp1);
+        }
+
     }
+}
+
+int increment_score(void) {
+    return rand() % 2;
 }

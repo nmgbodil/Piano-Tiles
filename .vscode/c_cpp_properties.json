@@ -8,19 +8,19 @@
         {
             "name": "PlatformIO",
             "includePath": [
-                "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/include",
-                "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/src",
-                "/Users/gabrielogbalor/.platformio/packages/framework-cmsis/CMSIS/Include",
-                "/Users/gabrielogbalor/.platformio/packages/framework-cmsis-stm32f0/Include",
+                "C:/Users/nmgbo/OneDrive/School/Fall 2024-25 Semester/ECE 362/362-Piano-Tiles/include",
+                "C:/Users/nmgbo/OneDrive/School/Fall 2024-25 Semester/ECE 362/362-Piano-Tiles/src",
+                "C:/Users/nmgbo/.platformio/packages/framework-cmsis/CMSIS/Include",
+                "C:/Users/nmgbo/.platformio/packages/framework-cmsis-stm32f0/Include",
                 ""
             ],
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,
                 "path": [
-                    "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/include",
-                    "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/src",
-                    "/Users/gabrielogbalor/.platformio/packages/framework-cmsis/CMSIS/Include",
-                    "/Users/gabrielogbalor/.platformio/packages/framework-cmsis-stm32f0/Include",
+                    "C:/Users/nmgbo/OneDrive/School/Fall 2024-25 Semester/ECE 362/362-Piano-Tiles/include",
+                    "C:/Users/nmgbo/OneDrive/School/Fall 2024-25 Semester/ECE 362/362-Piano-Tiles/src",
+                    "C:/Users/nmgbo/.platformio/packages/framework-cmsis/CMSIS/Include",
+                    "C:/Users/nmgbo/.platformio/packages/framework-cmsis-stm32f0/Include",
                     ""
                 ]
             },
@@ -28,11 +28,11 @@
                 "PLATFORMIO=60116",
                 "STM32F0",
                 "STM32F091xC",
-                "STM32F091",
                 "F_CPU=48000000L",
+                "STM32F091",
                 ""
             ],
-            "compilerPath": "/Users/gabrielogbalor/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc",
+            "compilerPath": "C:/Users/nmgbo/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc.exe",
             "compilerArgs": [
                 "-mthumb",
                 "-mcpu=cortex-m0",
