@@ -8,19 +8,19 @@
         {
             "name": "PlatformIO",
             "includePath": [
-                "C:/Users/nmgbo/OneDrive/School/Fall 2024-25 Semester/ECE 362/362-Piano-Tiles/include",
-                "C:/Users/nmgbo/OneDrive/School/Fall 2024-25 Semester/ECE 362/362-Piano-Tiles/src",
-                "C:/Users/nmgbo/.platformio/packages/framework-cmsis/CMSIS/Include",
-                "C:/Users/nmgbo/.platformio/packages/framework-cmsis-stm32f0/Include",
+                "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/include",
+                "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/src",
+                "/Users/gabrielogbalor/.platformio/packages/framework-cmsis/CMSIS/Include",
+                "/Users/gabrielogbalor/.platformio/packages/framework-cmsis-stm32f0/Include",
                 ""
             ],
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,
                 "path": [
-                    "C:/Users/nmgbo/OneDrive/School/Fall 2024-25 Semester/ECE 362/362-Piano-Tiles/include",
-                    "C:/Users/nmgbo/OneDrive/School/Fall 2024-25 Semester/ECE 362/362-Piano-Tiles/src",
-                    "C:/Users/nmgbo/.platformio/packages/framework-cmsis/CMSIS/Include",
-                    "C:/Users/nmgbo/.platformio/packages/framework-cmsis-stm32f0/Include",
+                    "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/include",
+                    "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/src",
+                    "/Users/gabrielogbalor/.platformio/packages/framework-cmsis/CMSIS/Include",
+                    "/Users/gabrielogbalor/.platformio/packages/framework-cmsis-stm32f0/Include",
                     ""
                 ]
             },
@@ -32,7 +32,7 @@
                 "STM32F091",
                 ""
             ],
-            "compilerPath": "C:/Users/nmgbo/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc.exe",
+            "compilerPath": "/Users/gabrielogbalor/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc",
             "compilerArgs": [
                 "-mthumb",
                 "-mcpu=cortex-m0",
