@@ -375,111 +375,117 @@ GameMode current_mode = EASY;
 const char* mode_strings[] = {"Mode: Easy", "Mode: Medium", "Mode: Hard"};
 
 // Function prototypes
-void SystemClock_Config(void);
-void GPIO_Init(void);
-void SPI1_Init(void);
-void OLED_Init(void);
+void internal_clock(void);
+void enable_ports(void);
+void init_spi1(void);
+void spi1_init_oled(void);
+void spi_cmd(unsigned int data);
+void spi_data(unsigned int data);
 void display_game_mode(const char *mode);
-void cycle_game_mode(void);
+void setup_button_interrupt(void);
 void nano_wait(unsigned int n);
-void spi_cmd(uint8_t data);  // Prototype for spi_cmd
-void spi_data(uint8_t data); // Prototype for spi_data
+void cycle_game_mode(void);
 
-// GPIO initialization for button with EXTI (interrupt)
-void GPIO_Init(void) {
-    // Enable clock for GPIOA
+// Initialize GPIO for PA0 with external interrupt
+void setup_button_interrupt(void) {
+    // Enable GPIOA clock
     RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
 
-    // Set PA0 as input (button) with no pull-up/pull-down
-    GPIOA->MODER &= ~GPIO_MODER_MODER0;
-    GPIOA->PUPDR &= ~GPIO_PUPDR_PUPDR0;
+    // Configure PA0 as input for button
+    GPIOA->MODER &= ~GPIO_MODER_MODER0; // Set PA0 to input mode
+    GPIOA->PUPDR &= ~GPIO_PUPDR_PUPDR0; // No pull-up, no pull-down
 
-    // Configure EXTI line 0 for PA0
-    SYSCFG->EXTICR[0] &= ~SYSCFG_EXTICR1_EXTI0_PA;  // Map EXTI0 to PA0
-    EXTI->IMR |= EXTI_IMR_MR0;                      // Enable interrupt on line 0
-    EXTI->RTSR |= EXTI_RTSR_TR0;                    // Rising edge trigger
+    // Configure the EXTI (External Interrupt) for PA0
+    SYSCFG->EXTICR[0] &= ~SYSCFG_EXTICR1_EXTI0;  // Map EXTI0 to PA0
+    EXTI->IMR |= EXTI_IMR_IM0;                   // Unmask interrupt on EXTI0
+    EXTI->RTSR |= EXTI_RTSR_TR0;                 // Trigger on rising edge
 
-    // Set priority and enable EXTI0 interrupt in NVIC
-    NVIC_SetPriority(EXTI0_1_IRQn, 2);
-    NVIC_EnableIRQ(EXTI0_1_IRQn);
+    // Enable EXTI0 interrupt in NVIC
+    NVIC_SetPriority(EXTI0_1_IRQn, 1);           // Set priority
+    NVIC_EnableIRQ(EXTI0_1_IRQn);                // Enable EXTI0_1 interrupt
 }
 
 // EXTI0 interrupt handler for button press
 void EXTI0_1_IRQHandler(void) {
-    if (EXTI->PR & EXTI_PR_PR0) {        // Check if interrupt was from EXTI0
-        EXTI->PR |= EXTI_PR_PR0;         // Clear the pending interrupt flag
-        cycle_game_mode();               // Cycle game mode on button press
+    if (EXTI->PR & EXTI_PR_PR0) { // Check if EXTI0 triggered
+        EXTI->PR |= EXTI_PR_PR0;  // Clear interrupt flag
+        cycle_game_mode();        // Cycle to the next game mode
     }
 }
 
-// Function to cycle through game modes
+// Function to cycle through game modes and display the current mode
 void cycle_game_mode() {
     current_mode = (current_mode + 1) % 3;  // Cycle: EASY -> MEDIUM -> HARD -> EASY
     display_game_mode(mode_strings[current_mode]);  // Update OLED display
 }
 
-// SPI1 initialization for OLED communication
-void SPI1_Init(void) {
-    // Enable clock for GPIOA and SPI1
-    RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
-    RCC->APB2ENR |= RCC_APB2ENR_SPI1EN;
-
-    // Configure PA5 (SCK) and PA7 (MOSI) for alternate function (SPI1)
-    GPIOA->MODER &= ~(GPIO_MODER_MODER5 | GPIO_MODER_MODER7);
-    GPIOA->MODER |= GPIO_MODER_MODER5_1 | GPIO_MODER_MODER7_1;  // AF mode
-    GPIOA->AFR[0] &= ~((0xF << (5 * 4)) | (0xF << (7 * 4)));    // AF0 for SPI1
-    GPIOA->OSPEEDR |= GPIO_OSPEEDR_OSPEEDR5 | GPIO_OSPEEDR_OSPEEDR7; // High speed
-
-    // Configure SPI1
-    SPI1->CR1 = SPI_CR1_MSTR | SPI_CR1_BR_1 | SPI_CR1_SSM | SPI_CR1_SSI;  // Master, BR = fPCLK/8
-    SPI1->CR2 = SPI_CR2_DS_2 | SPI_CR2_DS_1 | SPI_CR2_DS_0;  // 8-bit data frame
-    SPI1->CR1 |= SPI_CR1_SPE;  // Enable SPI1
-}
-
-// OLED initialization commands
-void OLED_Init(void) {
-    nano_wait(1000000);  // Delay for OLED power-up
-
-    spi_cmd(0x38);  // Function set
-    spi_cmd(0x08);  // Display off
-    spi_cmd(0x01);  // Clear display
-    nano_wait(2000000);  // Wait 2 ms
-    spi_cmd(0x06);  // Entry mode set
-    spi_cmd(0x02);  // Cursor to home position
-    spi_cmd(0x0C);  // Display on
-}
-
-// Send command to OLED via SPI
-void spi_cmd(uint8_t data) {
-    while (!(SPI1->SR & SPI_SR_TXE)) {}  // Wait until TX buffer is empty
-    *((__IO uint8_t*)&SPI1->DR) = data;  // Send command data
-}
-
-// Send data to OLED via SPI
-void spi_data(uint8_t data) {
-    spi_cmd(data | 0x200);  // Data mode (set 9th bit)
-}
-
-// Display game mode on OLED
+// Function to display the game mode on OLED
 void display_game_mode(const char *mode) {
     spi_cmd(0x02);  // Set cursor to the beginning of the first line
     while (*mode) {
-        spi_data(*mode++);  // Send each character of mode string
+        spi_data(*mode++);  // Send each character of mode string to display
     }
 }
 
-// Delay function
+// Function to initialize internal clock (if required)
+void internal_clock(void) {
+    // Placeholder function for internal clock setup
+}
+
+// Initialize SPI1 for OLED
+void init_spi1(void) {
+    RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
+    RCC->APB2ENR |= RCC_APB2ENR_SPI1EN;
+
+    GPIOA->MODER &= ~(0xC000FC00);             
+    GPIOA->MODER |= (0x8000A800);              
+
+    GPIOA->AFR[0] &= ~(0xF0F00000);            
+    GPIOA->AFR[1] &= ~(0xF0000000);            
+
+    SPI1->CR1 &= ~SPI_CR1_SPE;
+    SPI1->CR1 |= SPI_CR1_BR | SPI_CR1_MSTR;
+    SPI1->CR2 |= SPI_CR2_DS_3 | SPI_CR2_DS_0;  
+    SPI1->CR2 &= ~(SPI_CR2_DS_1 | SPI_CR2_DS_2); 
+    SPI1->CR2 |= SPI_CR2_TXDMAEN | SPI_CR2_SSOE | SPI_CR2_NSSP;
+    SPI1->CR1 |= SPI_CR1_SPE;  // Enable SPI1
+}
+
+// Initialize the OLED display using SPI commands
+void spi1_init_oled(void) {
+    nano_wait(1000000);  // wait 1 ms
+    spi_cmd(0x38); // Function set
+    spi_cmd(0x08); // Display off
+    spi_cmd(0x01); // Clear display
+    nano_wait(2000000); // wait 2 ms
+    spi_cmd(0x06); // Entry mode set
+    spi_cmd(0x02); // Cursor to home position
+    spi_cmd(0x0C); // Display on
+}
+
+// Send a command to the OLED
+void spi_cmd(unsigned int data) {
+    while (!(SPI1->SR & SPI_SR_TXE)) { }  // Wait until TX buffer is empty
+    SPI1->DR = data;
+}
+
+// Send data to the OLED
+void spi_data(unsigned int data) {
+    spi_cmd(data | 0x200);  // Add 0x200 to mark data instead of command
+}
+
+// Short delay function
 void nano_wait(unsigned int n) {
     asm("mov r0,%0\n repeat: sub r0,#83\n bgt repeat\n" : : "r"(n) : "r0", "cc");
 }
 
 // Main function
 int main(void) {
-    SystemClock_Config();  // Configure the system clock
-
-    GPIO_Init();            // Initialize GPIO for button input
-    SPI1_Init();            // Initialize SPI1 for OLED communication
-    OLED_Init();            // Initialize OLED display settings
+    internal_clock();        // Initialize system clock
+    enable_ports();          // Enable GPIO (placeholder function in your setup)
+    setup_button_interrupt();// Initialize button for mode selection
+    init_spi1();             // Initialize SPI1 for OLED communication
+    spi1_init_oled();        // Initialize OLED display settings
 
     // Display the initial game mode on OLED
     display_game_mode(mode_strings[current_mode]);
@@ -488,15 +494,4 @@ int main(void) {
     while (1) {
         // Do nothing; wait for button interrupts
     }
-}
-
-// System Clock Configuration
-void SystemClock_Config(void) {
-    // Configure system clock for CMSIS, using HSI oscillator at 8 MHz
-    RCC->CR |= RCC_CR_HSION;                         // Enable HSI
-    while (!(RCC->CR & RCC_CR_HSIRDY));              // Wait for HSI ready
-    RCC->CFGR |= RCC_CFGR_SW_HSI;                    // Select HSI as system clock
-    RCC->CFGR |= RCC_CFGR_HPRE_DIV1;                 // Set AHB prescaler
-    RCC->CFGR |= RCC_CFGR_PPRE_DIV1;                 // Set APB prescaler
-    RCC->CFGR |= RCC_CFGR_MCO_SYSCLK | RCC_CFGR_MCOPRE_DIV16; // Optional MCO config
 }
