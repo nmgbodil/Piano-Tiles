@@ -28,8 +28,8 @@
                 "PLATFORMIO=60116",
                 "STM32F0",
                 "STM32F091xC",
-                "F_CPU=48000000L",
                 "STM32F091",
+                "F_CPU=48000000L",
                 ""
             ],
             "compilerPath": "/Users/gabrielogbalor/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc",
