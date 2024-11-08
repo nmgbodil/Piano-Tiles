@@ -317,16 +317,15 @@ void game(void)
             else {
                 spi1_dma_display1("Mode: Hard");
             }
-            spi1_dma_display2("Score: 0");
+            spi1_dma_display2("Score: 000");
             start = 0;
 
             // asm("cpsie i");
         }
-        else {
+        else if (!start){
             score += increment_score();
-            sprintf(score_str, "%d", score);
-            strcat(disp2, score_str);
-            spi1_dma_display2(disp1);
+            snprintf(disp2, 12, "Score: %03d", score);
+            spi1_dma_display2(disp2);
         }
 
     }

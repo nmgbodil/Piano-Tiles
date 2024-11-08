@@ -1,20 +1,3 @@
-/**
-  ******************************************************************************
-  * @file    main.c
-  * @author  Weili An, Niraj Menon
-  * @date    Feb 3, 2024
-  * @brief   ECE 362 Lab 6 Student template
-  ******************************************************************************
-*/
-
-/*******************************************************************************/
-
-// Fill out your username, otherwise your completion code will have the 
-// wrong username!
-const char* username = "nmgbodil";
-
-/*******************************************************************************/ 
-
 #include "stm32f0xx.h"
 #include <stdio.h>
 
@@ -23,7 +6,6 @@ void nano_wait(unsigned int);
 void game(void);
 void internal_clock();
 void check_wiring();
-void autotest();
 
 //===========================================================================
 // Configure GPIOC
@@ -57,72 +39,7 @@ int msg_index = 0;
 uint16_t msg[8] = { 0x0000,0x0100,0x0200,0x0300,0x0400,0x0500,0x0600,0x0700 };
 extern const char font[];
 
-//===========================================================================
-// Configure PB12 (CS), PB13 (SCK), and PB15 (SDI) for outputs
-//===========================================================================
-void setup_bb(void) {
-    RCC->AHBENR |= RCC_AHBENR_GPIOBEN;
-    GPIOB->MODER &= 0x75FFFFFF;
-    GPIOB->MODER |= 0x45000000;
-    GPIOB->BSRR |= 0x20001000;
-}
 
-void small_delay(void) {
-    nano_wait(50000);
-}
-
-//===========================================================================
-// Set the MOSI bit, then set the clock high and low.
-// Pause between doing these steps with small_delay().
-//===========================================================================
-void bb_write_bit(int val) {
-    // CS (PB12)
-    // SCK (PB13)
-    // SDI (PB15)
-    int bit = val != 0;
-    GPIOB->BSRR |= ((1 << (15 + !bit * 16)));
-    small_delay();
-    GPIOB->BSRR |= 0x00002000;
-    small_delay();
-    GPIOB->BSRR |= 0x20000000;
-}
-
-//===========================================================================
-// Set CS (PB12) low,
-// write 16 bits using bb_write_bit,
-// then set CS high.
-//===========================================================================
-void bb_write_halfword(int halfword) {
-    GPIOB->BSRR |= 0x10000000;
-    for (int i = 15; i >= 0; i--) {
-        bb_write_bit(halfword & (1 << i));
-    }
-    GPIOB->BSRR |= 0x00001000;
-}
-
-//===========================================================================
-// Continually bitbang the msg[] array.
-//===========================================================================
-void drive_bb(void) {
-    for(;;)
-        for(int d=0; d<8; d++) {
-            bb_write_halfword(msg[d]);
-            nano_wait(1000000); // wait 1 ms between digits
-        }
-}
-
-//============================================================================
-// Configure Timer 15 for an update rate of 1 kHz.
-// Trigger the DMA channel on each update.
-// Copy this from lab 4 or lab 5.
-//============================================================================
-void init_tim15(void) {
-    RCC->APB2ENR |= RCC_APB2ENR_TIM15EN;
-    TIM15->PSC = 4799;
-    TIM15->ARR = 9;
-    TIM15->DIER |= TIM_DIER_UDE;
-    TIM15->CR1 |= TIM_CR1_CEN;
-}
 
 
 //===========================================================================
@@ -151,9 +68,9 @@ void TIM7_IRQHandler() {
     drive_column(col);
 }
 
-//===========================================================================
+// ===========================================================================
 // Initialize the SPI2 peripheral.
-//===========================================================================
+// ===========================================================================
 void init_spi2(void) {
     RCC->AHBENR |= RCC_AHBENR_GPIOBEN;
     RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
@@ -169,10 +86,10 @@ void init_spi2(void) {
     SPI2->CR1 |= SPI_CR1_SPE;
 }
 
-//===========================================================================
+// ===========================================================================
 // Configure the SPI2 peripheral to trigger the DMA channel when the
 // transmitter is empty.  Use the code from setup_dma from lab 5.
-//===========================================================================
+// ===========================================================================
 void spi2_setup_dma(void) {
     RCC->AHBENR |= RCC_AHBENR_DMA1EN;
     DMA1_Channel5->CCR &= ~DMA_CCR_EN;
@@ -220,9 +137,7 @@ void spi_cmd(unsigned int data) {
         SPI1->DR = data;
     }
 }
-void spi_data(unsigned int data) {
-    spi_cmd(data | 0x200);
-}
+
 void spi1_init_oled() {
     nano_wait(1000000);
     spi_cmd(0x38);
@@ -232,22 +147,6 @@ void spi1_init_oled() {
     spi_cmd(0x06);
     spi_cmd(0x02);
     spi_cmd(0x0C);
-}
-void spi1_display1(const char *string) {
-    spi_cmd(0x02);
-    int i = 0;
-    while (string[i] != 0) {
-        spi_data(string[i]);
-        i++;
-    }
-}
-void spi1_display2(const char *string) {
-    spi_cmd(0xC0);
-    int i = 0;
-    while (string[i] != 0) {
-        spi_data(string[i]);
-        i++;
-    }
 }
 
 //===========================================================================
@@ -310,53 +209,6 @@ int main(void) {
     enable_ports();
     // setup keyboard
     init_tim7();
-
-    // LED array Bit Bang
-// #define BIT_BANG
-#if defined(BIT_BANG)
-    setup_bb();
-    drive_bb();
-#endif
-
-    // Direct SPI peripheral to drive LED display
-//#define SPI_LEDS
-#if defined(SPI_LEDS)
-    init_spi2();
-    spi2_setup_dma();
-    spi2_enable_dma();
-    init_tim15();
-    show_keys();
-#endif
-
-    // LED array SPI
-// #define SPI_LEDS_DMA
-#if defined(SPI_LEDS_DMA)
-    init_spi2();
-    spi2_setup_dma();
-    spi2_enable_dma();
-    show_keys();
-#endif
-
-    // SPI OLED direct drive
-// #define SPI_OLED
-#if defined(SPI_OLED)
-    init_spi1();
-    spi1_init_oled();
-    spi1_display1("Mode: Easy");
-    spi1_display2("Score: 56");
-#endif
-
-    // SPI
-// #define SPI_OLED_DMA
-#if defined(SPI_OLED_DMA)
-    init_spi1();
-    spi1_init_oled();
-    spi1_setup_dma();
-    spi1_enable_dma();
-#endif
-
-    // Uncomment when you are ready to generate a code.
-    // autotest();
 
     // Game on!  The goal is to score 100 points.
     game();
