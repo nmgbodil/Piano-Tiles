@@ -29,6 +29,7 @@
                 "STM32F0",
                 "STM32F091xC",
                 "F_CPU=48000000L",
+                "STM32F091",
                 ""
             ],
             "compilerPath": "C:/Users/nmgbo/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc.exe",
