@@ -269,9 +269,9 @@ void init_tim17(void)
     TIM17->CR1 |= TIM_CR1_CEN;
 }
 
-void init_spi2(void);
-void spi2_setup_dma(void);
-void spi2_enable_dma(void);
+// void init_spi2(void);
+// void spi2_setup_dma(void);
+// void spi2_enable_dma(void);
 void init_spi1(void);
 void spi1_init_oled(void);
 void spi1_setup_dma(void);
@@ -283,9 +283,9 @@ void game(void)
     // char* disp1_ = malloc(sizeof(char) * 17);
     // char* disp2_ = malloc(sizeof(char) * 17);
     // print("Score  0");
-    init_spi2();
-    spi2_setup_dma();
-    spi2_enable_dma();
+    // init_spi2();
+    // spi2_setup_dma();
+    // spi2_enable_dma();
     spi1_dma_display1("Hello!");
     spi1_dma_display2("Pick Mode: A B C");
     init_spi1();
