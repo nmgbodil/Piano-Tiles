@@ -1,6 +1,7 @@
 #include "stm32f0xx.h"
 #include <stdio.h>
 
+void nano_wait(unsigned int);
 //===========================================================================
 // Configure GPIOC
 //===========================================================================
@@ -109,40 +110,83 @@ void TIM7_IRQHandler() {
 //===========================================================================
 // 4.4 SPI OLED Display
 //===========================================================================
-void init_spi1() {
-    RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
-    RCC->APB2ENR |= RCC_APB2ENR_SPI1EN;
-    GPIOA->MODER &= ~0xC000CC00;
-    GPIOA->MODER |= 0x80008800;
-    GPIOA->AFR[0] &= ~0xF0F00000;
-    GPIOA->AFR[1] &= ~0xF0000000;
-    SPI1->CR1 &= ~SPI_CR1_SPE;
-    SPI1->CR1 |= SPI_CR1_BR;
-    SPI1->CR2 |= SPI_CR2_DS_3 | SPI_CR2_DS_0;
-    SPI1->CR2 &= ~SPI_CR2_DS_2;
-    SPI1->CR2 &= ~SPI_CR2_DS_1;
-    SPI1->CR1 |= SPI_CR1_MSTR;
-    SPI1->CR2 |= SPI_CR2_SSOE;
-    SPI1->CR2 |= SPI_CR2_NSSP;
-    SPI1->CR2 |= SPI_CR2_TXDMAEN;
-    SPI1->CR1 |= SPI_CR1_SPE;
-}
-void spi_cmd(unsigned int data) {
-    while (!(SPI1->SR & SPI_SR_TXE)) {
-        SPI1->DR = data;
-    }
+// void init_spi1() {
+//     RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
+//     RCC->APB2ENR |= RCC_APB2ENR_SPI1EN;
+//     GPIOA->MODER &= ~0xC000CC00;
+//     GPIOA->MODER |= 0x80008800;
+//     GPIOA->AFR[0] &= ~0xF0F00000;
+//     GPIOA->AFR[1] &= ~0xF0000000;
+//     SPI1->CR1 &= ~SPI_CR1_SPE;
+//     SPI1->CR1 |= SPI_CR1_BR;
+//     SPI1->CR2 |= SPI_CR2_DS_3 | SPI_CR2_DS_0;
+//     SPI1->CR2 &= ~SPI_CR2_DS_2;
+//     SPI1->CR2 &= ~SPI_CR2_DS_1;
+//     SPI1->CR1 |= SPI_CR1_MSTR;
+//     SPI1->CR2 |= SPI_CR2_SSOE;
+//     SPI1->CR2 |= SPI_CR2_NSSP;
+//     SPI1->CR2 |= SPI_CR2_TXDMAEN;
+//     SPI1->CR1 |= SPI_CR1_SPE;
+// }
+
+void init_spi2(void) {
+    // Enable clocks for GPIOB and SPI2
+    RCC->AHBENR |= RCC_AHBENR_GPIOBEN; // Enable GPIOB clock
+    RCC->APB1ENR |= RCC_APB1ENR_SPI2EN; // Enable SPI2 clock
+
+    // Configure PB13 (SCK), PB15 (MOSI), PB12 (NSS)
+    GPIOB->MODER &= ~((3 << (13 * 2)) | (3 << (15 * 2)) | (3 << (12 * 2))); // Clear MODER
+    GPIOB->MODER |= (2 << (13 * 2)) | (2 << (15 * 2)) | (1 << (12 * 2));    // Alternate function for SCK, MOSI, output for NSS
+    GPIOB->AFR[1] &= ~((0xF << ((13 - 8) * 4)) | (0xF << ((15 - 8) * 4)));  // Clear alternate function bits
+    GPIOB->AFR[1] |= (0 << ((13 - 8) * 4)) | (0 << ((15 - 8) * 4));         // Set AF0 for SPI2
+
+    // Configure SPI2
+    SPI2->CR1 &= ~SPI_CR1_SPE;       // Disable SPI2 before configuration
+    SPI2->CR1 |= SPI_CR1_MSTR;       // Set as master
+    SPI2->CR1 |= SPI_CR1_BR;         // Set baud rate (max divisor)
+    SPI2->CR2 |= SPI_CR2_DS_3 | SPI_CR2_DS_2 | SPI_CR2_DS_1 | SPI_CR2_DS_0; // Data size: 8 bits
+    SPI2->CR2 &= ~(SPI_CR2_DS_2 | SPI_CR2_DS_1);
+    SPI2->CR2 |= SPI_CR2_SSOE;       // Enable NSS output
+    SPI2->CR2 |= SPI_CR2_NSSP;
+    SPI2->CR1 |= SPI_CR1_SPE;        // Enable SPI2
 }
 
-void spi1_init_oled() {
-    nano_wait(1000000);
-    spi_cmd(0x38);
-    spi_cmd(0x08);
-    spi_cmd(0x01);
-    nano_wait(2000000);
-    spi_cmd(0x06);
-    spi_cmd(0x02);
-    spi_cmd(0x0C);
+
+// void spi_cmd(unsigned int data) {
+//     while (!(SPI1->SR & SPI_SR_TXE)) {
+//         SPI1->DR = data;
+//     }
+// }
+
+void spi_cmd(unsigned int data) {
+    while (!(SPI2->SR & SPI_SR_TXE)); // Wait for TXE (transmit buffer empty)
+    SPI2->DR = data;                  // Write data to SPI2 data register
+    while (SPI2->SR & SPI_SR_BSY);    // Wait for BSY (busy flag) to clear
 }
+
+
+// void spi1_init_oled() {
+//     nano_wait(1000000);
+//     spi_cmd(0x38);
+//     spi_cmd(0x08);
+//     spi_cmd(0x01);
+//     nano_wait(2000000);
+//     spi_cmd(0x06);
+//     spi_cmd(0x02);
+//     spi_cmd(0x0C);
+// }
+
+void spi2_init_oled(void) {
+    nano_wait(1000000);
+    spi_cmd(0x38); // Function set
+    spi_cmd(0x08); // Display off
+    spi_cmd(0x01); // Clear display
+    nano_wait(2000000);
+    spi_cmd(0x06); // Entry mode set
+    spi_cmd(0x02); // Return home
+    spi_cmd(0x0C); // Display on, cursor off
+}
+
 
 //===========================================================================
 // This is the 34-entry buffer to be copied into SPI1.
@@ -164,22 +208,41 @@ uint16_t display[34] = {
 // Configure the proper DMA channel to be triggered by SPI1_TX.
 // Set the SPI1 peripheral to trigger a DMA when the transmitter is empty.
 //===========================================================================
-void spi1_setup_dma(void) {
-    RCC->AHBENR |= RCC_AHBENR_DMA1EN;
-    DMA1_Channel3->CCR &= ~DMA_CCR_EN;
-    DMA1_Channel3->CMAR = (uint32_t*) display;
-    DMA1_Channel3->CPAR = &SPI1->DR;
-    DMA1_Channel3->CNDTR = 34;
-    DMA1_Channel3->CCR |= DMA_CCR_DIR;
-    DMA1_Channel3->CCR |= DMA_CCR_MINC;
-    DMA1_Channel3->CCR |= DMA_CCR_MSIZE_0;
-    DMA1_Channel3->CCR |= DMA_CCR_PSIZE_0;
-    DMA1_Channel3->CCR |= DMA_CCR_CIRC;
+// void spi1_setup_dma(void) {
+//     RCC->AHBENR |= RCC_AHBENR_DMA1EN;
+//     DMA1_Channel3->CCR &= ~DMA_CCR_EN;
+//     DMA1_Channel3->CMAR = (uint32_t*) display;
+//     DMA1_Channel3->CPAR = &SPI1->DR;
+//     DMA1_Channel3->CNDTR = 34;
+//     DMA1_Channel3->CCR |= DMA_CCR_DIR;
+//     DMA1_Channel3->CCR |= DMA_CCR_MINC;
+//     DMA1_Channel3->CCR |= DMA_CCR_MSIZE_0;
+//     DMA1_Channel3->CCR |= DMA_CCR_PSIZE_0;
+//     DMA1_Channel3->CCR |= DMA_CCR_CIRC;
+// }
+
+void spi2_setup_dma(void) {
+    RCC->AHBENR |= RCC_AHBENR_DMA1EN; // Enable DMA1 clock
+    DMA1_Channel5->CCR &= ~DMA_CCR_EN; // Disable DMA channel
+    DMA1_Channel5->CMAR = (uint32_t)display; // Memory address (data source)
+    DMA1_Channel5->CPAR = (uint32_t)&SPI2->DR; // Peripheral address (SPI2 data register)
+    DMA1_Channel5->CNDTR = 34; // Number of data items to transfer
+    DMA1_Channel5->CCR |= DMA_CCR_DIR; // Memory-to-peripheral
+    DMA1_Channel5->CCR |= DMA_CCR_MINC; // Memory increment mode
+    DMA1_Channel5->CCR |= DMA_CCR_MSIZE_0; // Memory size: 16 bits
+    DMA1_Channel5->CCR |= DMA_CCR_PSIZE_0; // Peripheral size: 16 bits
+    DMA1_Channel5->CCR |= DMA_CCR_CIRC; // Circular mode
+    SPI2->CR2 |= SPI_CR2_TXDMAEN; // Enable TX DMA for SPI2
 }
+
 
 //===========================================================================
 // Enable the DMA channel triggered by SPI1_TX.
 //===========================================================================
-void spi1_enable_dma(void) {
-    DMA1_Channel3->CCR |= DMA_CCR_EN;
+// void spi1_enable_dma(void) {
+//     DMA1_Channel3->CCR |= DMA_CCR_EN;
+// }
+
+void spi2_enable_dma(void) {
+    DMA1_Channel5->CCR |= DMA_CCR_EN; // Enable DMA channel
 }

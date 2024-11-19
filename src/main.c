@@ -14,7 +14,12 @@ void enable_ports();
 void init_tim7();
 void update_screen(void);
 void main_game();
-void spi1_dma_display1(const char* str);
+void init_spi2(void);
+void spi2_init_oled();
+void spi2_setup_dma();
+void spi2_enable_dma();
+void spi2_dma_display1(const char* str);
+void spi2_dma_display2(const char* str);
 
 //===========================================================================
 // Main function
@@ -23,7 +28,7 @@ void spi1_dma_display1(const char* str);
 extern uint8_t col;
 extern int msg_index;
 extern uint16_t msg[8];
-const char font[];
+// const char font[];
 
 
 void init_usart5() {
@@ -232,8 +237,8 @@ void init_tim1(void) {
     // Enable update interrupt
     TIM1->DIER |= TIM_DIER_UIE;
 
-    // Enable the timer
-    TIM1->CR1 |= TIM_CR1_CEN;
+    // Disable the timer
+    TIM1->CR1 &= ~TIM_CR1_CEN;
 
     // Enable Timer 1 interrupt in NVIC
     NVIC_EnableIRQ(TIM1_BRK_UP_TRG_COM_IRQn);
@@ -268,8 +273,8 @@ void init_tim2(void) {
     // Enable update interrupt
     TIM2->DIER |= TIM_DIER_UIE;
 
-    // Enable the timer
-    TIM2->CR1 |= TIM_CR1_CEN;
+    // Disable the timer
+    TIM2->CR1 &= ~TIM_CR1_CEN;
 
     // Enable Timer 2 interrupt in NVIC
     NVIC_EnableIRQ(TIM2_IRQn);
@@ -355,9 +360,22 @@ void main_game() {
     for (int i = 0; i < NUM_NOTES; i++) {
         y_positions[i] = -1;
     }
-
+    
+    LCD_Setup();
+    LCD_Clear(0x0000);
     set_song_speed(game_speed);
     set_screen_update_speed(game_speed);
+
+    TIM1->CR1 |= TIM_CR1_CEN; // Enable timer 1
+    TIM2->CR1 |= TIM_CR1_CEN; // Enable timer 2
+
+    init_spi2();
+    spi2_init_oled();
+    spi2_setup_dma();
+    spi2_enable_dma();
+    spi2_dma_display1("Hello!");
+    spi2_dma_display2("Pick Mode: A B C");
+
     
     for (;;) {
         if (screen_update_flag) {
@@ -367,27 +385,29 @@ void main_game() {
     }
 }
 
-// #define MAIN
+#define MAIN
 #ifdef MAIN
 #include "stdio.h"
 
 int main() {
     internal_clock();
+
+    enable_ports();
+    init_tim7(); // setup keyboard
+    init_tim1();
+    init_tim2();
+
     init_usart5();
     enable_tty_interrupt();
     setbuf(stdin,0);
     setbuf(stdout,0);
     setbuf(stderr,0);
 
-    LCD_Setup();
-    LCD_Clear(0x0000);
-    init_tim1();
-    init_tim2();
     main_game();
 }
 #endif
 
-#define ORIG
+// #define ORIG
 #ifdef ORIG
 #include <stdio.h>
 int main(void) {
