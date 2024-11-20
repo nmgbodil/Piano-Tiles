@@ -20,6 +20,14 @@ void spi2_setup_dma();
 void spi2_enable_dma();
 void spi2_dma_display1(const char* str);
 void spi2_dma_display2(const char* str);
+char get_keypress();
+void check_button_press(int index);
+char get_key_event();
+void update_score(int val);
+void mistake(const char* mode);
+void set_tile_color(int color);
+void end_game();
+
 
 //===========================================================================
 // Main function
@@ -216,14 +224,22 @@ void init_lcd_spi(void) {
 #define TILE_HEIGHT 30
 #define NUM_COLUMNS 4
 #define NUM_NOTES 26
+#define TIMEOUT 1000000
 
 int current_time = 0;       // Current song time (in ms), updated by Timer 1
 int tile_duration = 2000;   // Time for a tile to move from top to bottom (in ms)
 int game_speed = 1;             // Game speed multiplier (1 = easy, 2 = med, 3 = hard)
 int song_length = 16500;
 bool screen_update_flag = false;
+bool game_over_flag = false;
+
+int score = 0;
+int multiplier = 5;
+int lives;
+char disp[16];
 
 extern Note song_notes[NUM_NOTES];
+extern int mult_to_colot[3];
 
 void init_tim1(void) {
     // Enable clock for Timer 1
@@ -334,6 +350,8 @@ void update_screen(void) {
             // Update the new tile position
             y_positions[i] = y_position;
 
+            if (y_positions[i] )
+
             // Assign a random column (x-position) if not already assigned
             if (x_positions[i] == -1) { // Use -1 as a marker for uninitialized tiles
                 x_positions[i] = (rand() % NUM_COLUMNS) * (TILE_WIDTH + 10);
@@ -347,12 +365,93 @@ void update_screen(void) {
                 y_positions[i] + TILE_HEIGHT,
                 song_notes[i].color
             );
+
+            if (y_positions[i] >= SCREEN_HEIGHT - TILE_HEIGHT) {
+                check_button_press(i);
+            }
         } else {
             // Reset the tile's position when it goes off-screen
             y_positions[i] = -1;
             x_positions[i] = -1;
         }
     }
+}
+
+void check_button_press(int index) {
+    int tile_column = x_positions[index] / (TILE_WIDTH + 10);
+
+    char pressed_key =  '\0';
+    char event;
+    for (int t = 0; t < TIMEOUT; t++) {
+        event = get_key_event();
+        if (event & 0x80) {
+            break;
+        }
+    }
+    pressed_key = event & 0x7F;
+
+    if (pressed_key && (pressed_key - tile_column == 65)) {
+        update_score(1);
+    }
+    else {
+        update_score(-1);
+    }
+    y_positions[index] = -1;
+}
+
+void update_score(int val) {
+    if (val == 1) {
+        score += val * multiplier;
+        snprintf(disp, 17, "Score: %03d    x%d", score, multiplier);
+        spi2_dma_display2(disp);
+        return;
+    }
+    else {
+        switch (game_speed) {
+            case 1:
+                mistake("Easy");
+                break;
+            case 2:
+                mistake("Medium");
+                break;
+            case 3:
+                mistake("Hard");
+                break;
+        }
+    }
+
+}
+
+void mistake(const char* mode) {
+    multiplier -= 2;
+    lives--;
+    if (lives == 0) {
+        game_over_flag = true;
+    }
+    else {
+        set_tile_color(mult_to_color[multiplier - 1]);
+        snprintf(disp, 16, "Mode: %s    x%d", mode, lives);
+        spi2_dma_display1(disp);
+        snprintf(disp, 17, "Score: %03d    x%d", score, multiplier);
+        spi2_dma_display2(disp);
+    }
+}
+
+void set_tile_color(int color) {
+    for (int i = 0; i < NUM_NOTES; i++) {
+        song_notes[i].color = color;
+    }
+}
+
+void end_game() {
+    TIM1->CR1 &= ~TIM_CR1_CEN; // Disable timer 1
+    TIM2->CR1 &= ~TIM_CR1_CEN; // Disable timer 2
+
+    LCD_Clear(0x0000);
+
+    snprintf(disp, 17, "   Score: %03d   ", score);
+    spi2_dma_display1("   Game Over!   ");
+    spi2_dma_display2(disp);
 }
 
 
@@ -363,11 +462,6 @@ void main_game() {
     
     LCD_Setup();
     LCD_Clear(0x0000);
-    set_song_speed(game_speed);
-    set_screen_update_speed(game_speed);
-
-    TIM1->CR1 |= TIM_CR1_CEN; // Enable timer 1
-    TIM2->CR1 |= TIM_CR1_CEN; // Enable timer 2
 
     init_spi2();
     spi2_init_oled();
@@ -375,19 +469,51 @@ void main_game() {
     spi2_enable_dma();
     spi2_dma_display1("Hello!");
     spi2_dma_display2("Pick Mode: A B C");
-
     
+    char key = get_keypress();
+    if (key == 'A') {
+        spi2_dma_display1("Mode: Easy    x3");
+        game_speed = 1;
+        tile_duration = 2000;
+        lives = 3;
+    }
+    else if (key == 'B') {
+        spi2_dma_display1("Mode: Medium  x2");
+        game_speed = 2;
+        tile_duration = 1500;
+        lives = 2;
+    }
+    else {
+        spi2_dma_display1("Mode: Hard    x1");
+        game_speed = 3;
+        tile_duration = 1000;
+        lives = 1;
+    }
+    spi2_dma_display2("Score: 000    x5");
+    set_song_speed(game_speed);
+    set_screen_update_speed(game_speed);
+    set_tile_color(0x07E0);
+    nano_wait(100000);
+
+    TIM1->CR1 |= TIM_CR1_CEN; // Enable timer 1
+    TIM2->CR1 |= TIM_CR1_CEN; // Enable timer 2
+
     for (;;) {
-        if (screen_update_flag) {
+        if (screen_update_flag) {              
             update_screen();
             screen_update_flag = false;
+        }
+
+        if (game_over_flag) {
+            end_game();
+            break;
         }
     }
 }
 
 #define MAIN
 #ifdef MAIN
-#include "stdio.h"
+#include <stdio.h>
 
 int main() {
     internal_clock();
@@ -404,30 +530,5 @@ int main() {
     setbuf(stderr,0);
 
     main_game();
-}
-#endif
-
-// #define ORIG
-#ifdef ORIG
-#include <stdio.h>
-int main(void) {
-    internal_clock();
-
-    // msg[0] |= font['E'];
-    // msg[1] |= font['C'];
-    // msg[2] |= font['E'];
-    // msg[3] |= font[' '];
-    // msg[4] |= font['3'];
-    // msg[5] |= font['6'];
-    // msg[6] |= font['2'];
-    // msg[7] |= font[' '];
-
-    // GPIO enable
-    enable_ports();
-    // setup keyboard
-    init_tim7();
-
-    // Game on!  The goal is to score 100 points.
-    game();
 }
 #endif

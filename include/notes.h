@@ -9,6 +9,9 @@ typedef struct {
 int y_positions[NUM_NOTES];
 int x_positions[NUM_NOTES];
 
+// Match colors to multiplier
+int mult_to_color[3] = {0xF800, 0x0000, 0xFD20};
+
 Note song_notes[NUM_NOTES] = {
     {0, 0xF800},    // E
     {500, 0x07E0},  // D

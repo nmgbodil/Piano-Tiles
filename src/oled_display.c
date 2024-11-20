@@ -135,19 +135,23 @@ void init_spi2(void) {
     RCC->APB1ENR |= RCC_APB1ENR_SPI2EN; // Enable SPI2 clock
 
     // Configure PB13 (SCK), PB15 (MOSI), PB12 (NSS)
-    GPIOB->MODER &= ~((3 << (13 * 2)) | (3 << (15 * 2)) | (3 << (12 * 2))); // Clear MODER
-    GPIOB->MODER |= (2 << (13 * 2)) | (2 << (15 * 2)) | (1 << (12 * 2));    // Alternate function for SCK, MOSI, output for NSS
-    GPIOB->AFR[1] &= ~((0xF << ((13 - 8) * 4)) | (0xF << ((15 - 8) * 4)));  // Clear alternate function bits
-    GPIOB->AFR[1] |= (0 << ((13 - 8) * 4)) | (0 << ((15 - 8) * 4));         // Set AF0 for SPI2
+    GPIOB->MODER &= ~0xCF000000;
+    GPIOB->MODER |= 0x8A000000;
+    // GPIOB->MODER &= ~((3 << (13 * 2)) | (3 << (15 * 2)) | (3 << (12 * 2))); // Clear MODER
+    // GPIOB->MODER |= (2 << (13 * 2)) | (2 << (15 * 2)) | (1 << (12 * 2));    // Alternate function for SCK, MOSI, output for NSS
+    // GPIOB->AFR[1] &= ~((0xF << ((13 - 8) * 4)) | (0xF << ((15 - 8) * 4)));  // Clear alternate function bits
+    // GPIOB->AFR[1] |= (0 << ((13 - 8) * 4)) | (0 << ((15 - 8) * 4));        // Set AF0 for SPI2
+    GPIOB->AFR[1] &= ~0x0000FF0F;
 
     // Configure SPI2
     SPI2->CR1 &= ~SPI_CR1_SPE;       // Disable SPI2 before configuration
     SPI2->CR1 |= SPI_CR1_MSTR;       // Set as master
     SPI2->CR1 |= SPI_CR1_BR;         // Set baud rate (max divisor)
-    SPI2->CR2 |= SPI_CR2_DS_3 | SPI_CR2_DS_2 | SPI_CR2_DS_1 | SPI_CR2_DS_0; // Data size: 8 bits
+    SPI2->CR2 |= SPI_CR2_DS_3 | SPI_CR2_DS_0; // Data size: 10 bits
     SPI2->CR2 &= ~(SPI_CR2_DS_2 | SPI_CR2_DS_1);
     SPI2->CR2 |= SPI_CR2_SSOE;       // Enable NSS output
     SPI2->CR2 |= SPI_CR2_NSSP;
+    SPI2->CR2 |= SPI_CR2_TXDMAEN;
     SPI2->CR1 |= SPI_CR1_SPE;        // Enable SPI2
 }
 
@@ -159,9 +163,13 @@ void init_spi2(void) {
 // }
 
 void spi_cmd(unsigned int data) {
-    while (!(SPI2->SR & SPI_SR_TXE)); // Wait for TXE (transmit buffer empty)
-    SPI2->DR = data;                  // Write data to SPI2 data register
-    while (SPI2->SR & SPI_SR_BSY);    // Wait for BSY (busy flag) to clear
+    while (!(SPI2->SR & SPI_SR_TXE));   // Wait for TXE (transmit buffer empty)
+    SPI2->DR = data;                 // Write data to SPI2 data register
+    // while (SPI2->SR & SPI_SR_BSY);    // Wait for BSY (busy flag) to clear
+}
+
+void spi_data(unsigned int data) {
+    spi_cmd(data | 0x200);
 }
 
 
@@ -224,7 +232,7 @@ uint16_t display[34] = {
 void spi2_setup_dma(void) {
     RCC->AHBENR |= RCC_AHBENR_DMA1EN; // Enable DMA1 clock
     DMA1_Channel5->CCR &= ~DMA_CCR_EN; // Disable DMA channel
-    DMA1_Channel5->CMAR = (uint32_t)display; // Memory address (data source)
+    DMA1_Channel5->CMAR = (uint32_t)&display; // Memory address (data source)
     DMA1_Channel5->CPAR = (uint32_t)&SPI2->DR; // Peripheral address (SPI2 data register)
     DMA1_Channel5->CNDTR = 34; // Number of data items to transfer
     DMA1_Channel5->CCR |= DMA_CCR_DIR; // Memory-to-peripheral
@@ -232,7 +240,7 @@ void spi2_setup_dma(void) {
     DMA1_Channel5->CCR |= DMA_CCR_MSIZE_0; // Memory size: 16 bits
     DMA1_Channel5->CCR |= DMA_CCR_PSIZE_0; // Peripheral size: 16 bits
     DMA1_Channel5->CCR |= DMA_CCR_CIRC; // Circular mode
-    SPI2->CR2 |= SPI_CR2_TXDMAEN; // Enable TX DMA for SPI2
+    // SPI2->CR2 |= SPI_CR2_TXDMAEN; // Enable TX DMA for SPI2
 }
 
 

@@ -235,7 +235,7 @@ void spi2_dma_display2(const char *str) {
 }
 
 
-int score = 0;
+// int score = 0;
 char disp1[17] = "                ";
 char disp2[17] = "                ";
 char score_str[6];
