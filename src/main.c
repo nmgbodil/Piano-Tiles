@@ -223,290 +223,221 @@ void init_lcd_spi(void) {
 #define TILE_WIDTH 53
 #define TILE_HEIGHT 30
 #define NUM_COLUMNS 4
-#define NUM_NOTES 26
-#define TIMEOUT 1000000
+#define NUM_TILES 20  // Number of active tiles we'll track
 
-int current_time = 0;       // Current song time (in ms), updated by Timer 1
-int tile_duration = 2000;   // Time for a tile to move from top to bottom (in ms)
-int game_speed = 1;             // Game speed multiplier (1 = easy, 2 = med, 3 = hard)
-int song_length = 16500;
-bool screen_update_flag = false;
-bool game_over_flag = false;
+typedef struct {
+    int x;
+    int y;
+    bool active;
+    int column;
+} Tile;
 
+// Global variables
+Tile tiles[NUM_TILES];
 int score = 0;
-int multiplier = 5;
-int lives;
-char disp[16];
+bool screen_update_flag = false;
+int lives = 3;  // Start with 3 lives
+bool game_over = false;
+uint16_t current_tile_color = GREEN;
 
-extern Note song_notes[NUM_NOTES];
-extern int mult_to_colot[3];
+// Add these globals at the top
+#define SPEED_EASY 3      // Slower tile movement
+#define SPEED_MEDIUM 5    // Medium tile movement
+#define SPEED_HARD 7      // Faster tile movement
+int current_speed = SPEED_EASY;
+bool game_started = false;
 
-void init_tim1(void) {
-    // Enable clock for Timer 1
-    RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
-
-    // Set the timer period
-    // Assuming the timer clock is 48 MHz and we want a period of 10 ms:
-    TIM1->PSC = 48000 - 1;  // Prescaler to divide the clock down to 1 kHz (1 ms per count)
-    TIM1->ARR = 10 - 1;     // Auto-reload value for 10 ms period
-
-    // Enable update interrupt
-    TIM1->DIER |= TIM_DIER_UIE;
-
-    // Disable the timer
-    TIM1->CR1 &= ~TIM_CR1_CEN;
-
-    // Enable Timer 1 interrupt in NVIC
-    NVIC_EnableIRQ(TIM1_BRK_UP_TRG_COM_IRQn);
-    NVIC_SetPriority(TIM1_BRK_UP_TRG_COM_IRQn, 1); // Set priority
-}
-
-void TIM1_BRK_UP_TRG_COM_IRQHandler(void) {
-    if (TIM1->SR & TIM_SR_UIF) {  // Check if the update interrupt flag is set
-        TIM1->SR &= ~TIM_SR_UIF;  // Clear the update interrupt flag
-
-        // Perform any periodic task here (e.g., updating the current time)
-        current_time += 10; // Increment the timer (10 ms per interrupt)
-        if (current_time >= song_length) {
-            current_time = 0; // Wrap around at the end of the song
-        }
-    }
-}
-
-
-void init_tim2(void) {
-    // Enable clock for Timer 2
-    RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
-
-    // Set the timer period
-    // Assuming the timer clock is 48 MHz and we want a frame rate of 30 Hz:
-    TIM2->PSC = 48000 - 1;  // Prescaler to divide the clock down to 1 kHz (1 ms per count)
-    TIM2->ARR = 33 - 1;     // Auto-reload value for ~30 Hz (1000 ms / 30 frames)
-
-    // Clear any pending interrupt flags
-    TIM2->SR &= ~TIM_SR_UIF; // Clear the update interrupt flag
-
-    // Enable update interrupt
-    TIM2->DIER |= TIM_DIER_UIE;
-
-    // Disable the timer
-    TIM2->CR1 &= ~TIM_CR1_CEN;
-
-    // Enable Timer 2 interrupt in NVIC
-    NVIC_EnableIRQ(TIM2_IRQn);
-    NVIC_SetPriority(TIM2_IRQn, 2); // Set priority (lower than Timer 1 if necessary)
-}
-
-void TIM2_IRQHandler(void) {
-    if (TIM2->SR & TIM_SR_UIF) { // Check if the interrupt flag is set
-        TIM2->SR &= ~TIM_SR_UIF; // Clear the interrupt flag
-
-        // Turn on flag to update screen
-        screen_update_flag = true;
-    }
-}
-
-void set_song_speed(int speed) {
-    if (speed == 1) { // Easy
-        TIM1->ARR = 10 - 1; // 10 ms increments
-    } else if (speed == 2) { // Medium
-        TIM1->ARR = 7 - 1; // 7 ms increments (faster song)
-    } else if (speed == 3) { // Hard
-        TIM1->ARR = 5 - 1; // 5 ms increments (even faster song)
-    }
-}
-
-void set_screen_update_speed(int speed) {
-    if (speed == 1) { // Easy
-        TIM2->ARR = 33 - 1; // ~30 Hz frame rate
-    } else if (speed == 2) { // Medium
-        TIM2->ARR = 25 - 1; // ~40 Hz frame rate
-    } else if (speed == 3) { // Hard
-        TIM2->ARR = 16 - 1; // ~60 Hz frame rate
-    }
-}
-
-void update_screen(void) {
-    for (int i = 0; i < NUM_NOTES; i++) {
-        // Check if the note is active
-        if (song_notes[i].start_time >= current_time - tile_duration &&
-            song_notes[i].start_time <= current_time) {
-
-            // Calculate the y-position based on time
-            int elapsed_time = current_time - song_notes[i].start_time;
-            int y_position = (elapsed_time * SCREEN_HEIGHT) / tile_duration;
-
-            // Clear the previous tile position (if it exists)
-            if (y_positions[i] != -1) { // -1 means no tile previously
-                LCD_DrawFillRectangle(
-                    x_positions[i], 
-                    y_positions[i], 
-                    x_positions[i] + TILE_WIDTH, 
-                    y_positions[i] + TILE_HEIGHT, 
-                    0x0000 // Black to clear the tile
-                );
-            }
-
-            // Update the new tile position
-            y_positions[i] = y_position;
-
-            if (y_positions[i] )
-
-            // Assign a random column (x-position) if not already assigned
-            if (x_positions[i] == -1) { // Use -1 as a marker for uninitialized tiles
-                x_positions[i] = (rand() % NUM_COLUMNS) * (TILE_WIDTH + 10);
-            }
-
-            // Draw the tile
-            LCD_DrawFillRectangle(
-                x_positions[i],
-                y_positions[i],
-                x_positions[i] + TILE_WIDTH,
-                y_positions[i] + TILE_HEIGHT,
-                song_notes[i].color
-            );
-
-            if (y_positions[i] >= SCREEN_HEIGHT - TILE_HEIGHT) {
-                check_button_press(i);
-            }
-        } else {
-            // Reset the tile's position when it goes off-screen
-            y_positions[i] = -1;
-            x_positions[i] = -1;
-        }
-    }
-}
-
-void check_button_press(int index) {
-    int tile_column = x_positions[index] / (TILE_WIDTH + 10);
-
-    char pressed_key =  '\0';
-    char event;
-    for (int t = 0; t < TIMEOUT; t++) {
-        event = get_key_event();
-        if (event & 0x80) {
+// Initialize a new tile at the top of a random column
+void spawn_tile() {
+    for (int i = 0; i < NUM_TILES; i++) {
+        if (!tiles[i].active) {
+            int column = rand() % NUM_COLUMNS;
+            tiles[i].column = column;
+            tiles[i].x = column * (TILE_WIDTH + 10);
+            tiles[i].y = 0;
+            tiles[i].active = true;
             break;
         }
     }
-    pressed_key = event & 0x7F;
-
-    if (pressed_key && (pressed_key - tile_column == 65)) {
-        update_score(1);
-    }
-    else {
-        update_score(-1);
-    }
-    y_positions[index] = -1;
 }
 
-void update_score(int val) {
-    if (val == 1) {
-        score += val * multiplier;
-        snprintf(disp, 17, "Score: %03d    x%d", score, multiplier);
-        spi2_dma_display2(disp);
+void update_screen() {
+    if (game_over) {
+        // Keep tiles red when game is over
+        for (int i = 0; i < NUM_TILES; i++) {
+            if (tiles[i].active) {
+                LCD_DrawFillRectangle(
+                    tiles[i].x,
+                    tiles[i].y,
+                    tiles[i].x + TILE_WIDTH,
+                    tiles[i].y + TILE_HEIGHT,
+                    RED
+                );
+            }
+        }
         return;
     }
-    else {
-        switch (game_speed) {
-            case 1:
-                mistake("Easy");
-                break;
-            case 2:
-                mistake("Medium");
-                break;
-            case 3:
-                mistake("Hard");
-                break;
+
+    // Clear previous positions and update
+    for (int i = 0; i < NUM_TILES; i++) {
+        if (tiles[i].active) {
+            // Clear old position
+            LCD_DrawFillRectangle(
+                tiles[i].x,
+                tiles[i].y,
+                tiles[i].x + TILE_WIDTH,
+                tiles[i].y + TILE_HEIGHT,
+                BLACK
+            );
+
+            // Update position using current_speed
+            tiles[i].y += current_speed;  // Speed varies by mode
+
+            // Check if tile has reached bottom
+            if (tiles[i].y >= SCREEN_HEIGHT - TILE_HEIGHT) {
+                tiles[i].active = false;
+                lives--;
+                
+                char lives_str[17];
+                snprintf(lives_str, 17, "Lives: %d", lives);
+                spi2_dma_display1(lives_str);
+
+                if (lives == 2) {
+                    current_tile_color = YELLOW;
+                }
+                else if (lives == 1) {
+                    current_tile_color = RED;
+                }
+                else if (lives <= 0) {
+                    game_over = true;
+                    spi2_dma_display1("Game Over!");
+                    char final_score[17];
+                    snprintf(final_score, 17, "Final Score: %d", score);
+                    spi2_dma_display2(final_score);
+                    return;
+                }
+                continue;
+            }
+
+            // Draw at new position with current color
+            LCD_DrawFillRectangle(
+                tiles[i].x,
+                tiles[i].y,
+                tiles[i].x + TILE_WIDTH,
+                tiles[i].y + TILE_HEIGHT,
+                current_tile_color
+            );
         }
     }
 
-}
-
-void mistake(const char* mode) {
-    multiplier -= 2;
-    lives--;
-    if (lives == 0) {
-        game_over_flag = true;
-    }
-    else {
-        set_tile_color(mult_to_color[multiplier - 1]);
-        snprintf(disp, 16, "Mode: %s    x%d", mode, lives);
-        spi2_dma_display1(disp);
-        snprintf(disp, 17, "Score: %03d    x%d", score, multiplier);
-        spi2_dma_display2(disp);
+    // Randomly spawn new tiles
+    // Adjust spawn rate based on difficulty
+    int spawn_chance = (current_speed == SPEED_EASY) ? 35 : 
+                      (current_speed == SPEED_MEDIUM) ? 30 : 25;
+    if (rand() % spawn_chance == 0) {
+        spawn_tile();
     }
 }
 
-void set_tile_color(int color) {
-    for (int i = 0; i < NUM_NOTES; i++) {
-        song_notes[i].color = color;
+void check_button_presses() {
+    char key = get_key_event();
+    if (key & 0x80) {  // If it's a press event
+        key &= 0x7F;   // Remove the press flag
+        
+        int pressed_column;
+        switch(key) {
+            case 'A': pressed_column = 0; break;
+            case 'B': pressed_column = 1; break;
+            case 'C': pressed_column = 2; break;
+            case 'D': pressed_column = 3; break;
+            default: return;
+        }
+
+        // Check for hits
+        for (int i = 0; i < NUM_TILES; i++) {
+            if (tiles[i].active && 
+                tiles[i].column == pressed_column && 
+                tiles[i].y >= SCREEN_HEIGHT - 2*TILE_HEIGHT) {
+                
+                score += 10;
+                tiles[i].active = false;
+                
+                // Update score display
+                char score_str[17];
+                snprintf(score_str, 17, "Score: %d", score);
+                spi2_dma_display2(score_str);
+                break;
+            }
+        }
     }
 }
-
-void end_game() {
-    TIM1->CR1 &= ~TIM_CR1_CEN; // Disable timer 1
-    TIM2->CR1 &= ~TIM_CR1_CEN; // Disable timer 2
-
-    LCD_Clear(0x0000);
-
-    snprintf(disp, 17, "   Score: %03d   ", score);
-    spi2_dma_display1("   Game Over!   ");
-    spi2_dma_display2(disp);
-}
-
 
 void main_game() {
-    for (int i = 0; i < NUM_NOTES; i++) {
-        y_positions[i] = -1;
-    }
-    
+    // Initialize display
     LCD_Setup();
-    LCD_Clear(0x0000);
+    LCD_Clear(BLACK);
 
+    // Initialize OLED displays
     init_spi2();
     spi2_init_oled();
     spi2_setup_dma();
     spi2_enable_dma();
-    spi2_dma_display1("Hello!");
-    spi2_dma_display2("Pick Mode: A B C");
     
-    char key = get_keypress();
-    if (key == 'A') {
-        spi2_dma_display1("Mode: Easy    x3");
-        game_speed = 1;
-        tile_duration = 2000;
-        lives = 3;
-    }
-    else if (key == 'B') {
-        spi2_dma_display1("Mode: Medium  x2");
-        game_speed = 2;
-        tile_duration = 1500;
-        lives = 2;
-    }
-    else {
-        spi2_dma_display1("Mode: Hard    x1");
-        game_speed = 3;
-        tile_duration = 1000;
-        lives = 1;
-    }
-    spi2_dma_display2("Score: 000    x5");
-    set_song_speed(game_speed);
-    set_screen_update_speed(game_speed);
-    set_tile_color(0x07E0);
-    nano_wait(100000);
+    // Show mode selection screen
+    spi2_dma_display1("Pick Mode:");
+    spi2_dma_display2("A:Easy B:Med C:Hard");
 
-    TIM1->CR1 |= TIM_CR1_CEN; // Enable timer 1
-    TIM2->CR1 |= TIM_CR1_CEN; // Enable timer 2
-
-    for (;;) {
-        if (screen_update_flag) {              
-            update_screen();
-            screen_update_flag = false;
+    // Wait for mode selection
+    while (!game_started) {
+        char key = get_key_event();
+        if (key & 0x80) {  // If it's a press event
+            key &= 0x7F;   // Remove the press flag
+            
+            switch(key) {
+                case 'A':
+                    current_speed = SPEED_EASY;
+                    spi2_dma_display1("Mode: Easy");
+                    game_started = true;
+                    break;
+                case 'B':
+                    current_speed = SPEED_MEDIUM;
+                    spi2_dma_display1("Mode: Medium");
+                    game_started = true;
+                    break;
+                case 'C':
+                    current_speed = SPEED_HARD;
+                    spi2_dma_display1("Mode: Hard");
+                    game_started = true;
+                    break;
+            }
         }
+    }
 
-        if (game_over_flag) {
-            end_game();
-            break;
+    // Short delay to show selected mode
+    nano_wait(1000000000);  // 1 second delay
+
+    // Initialize tiles
+    for (int i = 0; i < NUM_TILES; i++) {
+        tiles[i].active = false;
+    }
+
+    // Reset game state
+    lives = 3;
+    score = 0;
+    game_over = false;
+    current_tile_color = GREEN;
+
+    spi2_dma_display1("Lives: 3");
+    spi2_dma_display2("Score: 0");
+
+    // Initialize timer for keyboard
+    init_tim7();
+    
+    while(1) {
+        if (!game_over) {
+            update_screen();
+            check_button_presses();
+            nano_wait(100000000); // Base delay
         }
     }
 }
@@ -517,11 +448,8 @@ void main_game() {
 
 int main() {
     internal_clock();
-
     enable_ports();
     init_tim7(); // setup keyboard
-    init_tim1();
-    init_tim2();
 
     init_usart5();
     enable_tty_interrupt();

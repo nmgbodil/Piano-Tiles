@@ -96,33 +96,37 @@ void clear_display(void) {
 
 // 16 history bytes.  Each byte represents the last 8 samples of a button.
 uint8_t hist[16];
-char queue[2];  // A two-entry queue of button press/release events.
-int qin;        // Which queue entry is next for input
-int qout;       // Which queue entry is next for output
+#define QUEUE_SIZE 16
+char queue[QUEUE_SIZE];
+int qin = 0;
+int qout = 0;
 
 const char keymap[] = "DCBA#9630852*741";
 
 void push_queue(int n) {
-    queue[qin] = n;
-    qin ^= 1;
+    int next = (qin + 1) % QUEUE_SIZE;
+    if (next != qout) {  // Check if queue isn't full
+        queue[qin] = n;
+        qin = next;
+    }
 }
 
 char pop_queue() {
-    char tmp = queue[qout];
-    queue[qout] = 0;
-    qout ^= 1;
-    return tmp;
+    if (qin == qout) return 0;  // Empty queue
+    char val = queue[qout];
+    qout = (qout + 1) % QUEUE_SIZE;
+    return val;
 }
 
-void update_history(int c, int rows)
-{
-    // We used to make students do this in assembly language.
+char get_key_event(void) {
+    return pop_queue();
+}
+
+void update_history(int c, int rows) {
     for(int i = 0; i < 4; i++) {
         hist[4*c+i] = (hist[4*c+i]<<1) + ((rows>>i)&1);
         if (hist[4*c+i] == 0x01)
-            push_queue(0x80 | keymap[4*c+i]);
-        if (hist[4*c+i] == 0xfe)
-            push_queue(keymap[4*c+i]);
+            push_queue(0x80 | keymap[4*c+i]);  // Key press only
     }
 }
 
@@ -134,15 +138,6 @@ void drive_column(int c)
 int read_rows()
 {
     return (~GPIOC->IDR) & 0xf;
-}
-
-char get_key_event(void) {
-    for(;;) {
-        asm volatile ("wfi");   // wait for an interrupt
-        if (queue[qout] != 0)
-            break;
-    }
-    return pop_queue();
 }
 
 char get_keypress() {

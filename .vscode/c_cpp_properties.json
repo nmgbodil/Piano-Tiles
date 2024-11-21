@@ -8,19 +8,19 @@
         {
             "name": "PlatformIO",
             "includePath": [
-                "/Users/silijevs/Documents/ECE 36200/362-Piano-Tiles-1/include",
-                "/Users/silijevs/Documents/ECE 36200/362-Piano-Tiles-1/src",
-                "/Users/silijevs/.platformio/packages/framework-cmsis/CMSIS/Include",
-                "/Users/silijevs/.platformio/packages/framework-cmsis-stm32f0/Include",
+                "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/362-Piano-Tiles/include",
+                "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/362-Piano-Tiles/src",
+                "/Users/gabrielogbalor/.platformio/packages/framework-cmsis/CMSIS/Include",
+                "/Users/gabrielogbalor/.platformio/packages/framework-cmsis-stm32f0/Include",
                 ""
             ],
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,
                 "path": [
-                    "/Users/silijevs/Documents/ECE 36200/362-Piano-Tiles-1/include",
-                    "/Users/silijevs/Documents/ECE 36200/362-Piano-Tiles-1/src",
-                    "/Users/silijevs/.platformio/packages/framework-cmsis/CMSIS/Include",
-                    "/Users/silijevs/.platformio/packages/framework-cmsis-stm32f0/Include",
+                    "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/362-Piano-Tiles/include",
+                    "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/362-Piano-Tiles/src",
+                    "/Users/gabrielogbalor/.platformio/packages/framework-cmsis/CMSIS/Include",
+                    "/Users/gabrielogbalor/.platformio/packages/framework-cmsis-stm32f0/Include",
                     ""
                 ]
             },
@@ -32,7 +32,7 @@
                 "STM32F091",
                 ""
             ],
-            "compilerPath": "/Users/silijevs/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc",
+            "compilerPath": "/Users/gabrielogbalor/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc",
             "compilerArgs": [
                 "-mthumb",
                 "-mcpu=cortex-m0",
