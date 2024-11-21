@@ -246,6 +246,8 @@ uint16_t current_tile_color = GREEN;
 #define SPEED_HARD 7      // Faster tile movement
 int current_speed = SPEED_EASY;
 bool game_started = false;
+int multiplier = 10;  // Start with 10x multiplier
+uint16_t ORANGE = 0xFD20;  // Define orange color
 
 // Initialize a new tile at the top of a random column
 void spawn_tile() {
@@ -263,7 +265,7 @@ void spawn_tile() {
 
 void update_screen() {
     if (game_over) {
-        // Keep tiles red when game is over
+        // Keep tiles current color when game is over
         for (int i = 0; i < NUM_TILES; i++) {
             if (tiles[i].active) {
                 LCD_DrawFillRectangle(
@@ -271,17 +273,15 @@ void update_screen() {
                     tiles[i].y,
                     tiles[i].x + TILE_WIDTH,
                     tiles[i].y + TILE_HEIGHT,
-                    RED
+                    current_tile_color
                 );
             }
         }
         return;
     }
 
-    // Clear previous positions and update
     for (int i = 0; i < NUM_TILES; i++) {
         if (tiles[i].active) {
-            // Clear old position
             LCD_DrawFillRectangle(
                 tiles[i].x,
                 tiles[i].y,
@@ -290,25 +290,38 @@ void update_screen() {
                 BLACK
             );
 
-            // Update position using current_speed
-            tiles[i].y += current_speed;  // Speed varies by mode
+            tiles[i].y += current_speed;
 
-            // Check if tile has reached bottom
             if (tiles[i].y >= SCREEN_HEIGHT - TILE_HEIGHT) {
                 tiles[i].active = false;
                 lives--;
                 
                 char lives_str[17];
-                snprintf(lives_str, 17, "Lives: %d", lives);
+                snprintf(lives_str, 17, "Lives: %d x%d", lives, multiplier);
                 spi2_dma_display1(lives_str);
 
-                if (lives == 2) {
-                    current_tile_color = YELLOW;
+                // Different behavior for each mode
+                switch(current_speed) {
+                    case SPEED_EASY:
+                        if (lives == 2) {
+                            current_tile_color = YELLOW;
+                            multiplier = 5;
+                        }
+                        else if (lives == 1) {
+                            current_tile_color = RED;
+                            multiplier = 2;
+                        }
+                        break;
+                        
+                    case SPEED_MEDIUM:
+                        if (lives == 1) {
+                            current_tile_color = RED;
+                            multiplier = 5;
+                        }
+                        break;
                 }
-                else if (lives == 1) {
-                    current_tile_color = RED;
-                }
-                else if (lives <= 0) {
+
+                if (lives <= 0) {
                     game_over = true;
                     spi2_dma_display1("Game Over!");
                     char final_score[17];
@@ -319,7 +332,6 @@ void update_screen() {
                 continue;
             }
 
-            // Draw at new position with current color
             LCD_DrawFillRectangle(
                 tiles[i].x,
                 tiles[i].y,
@@ -330,11 +342,8 @@ void update_screen() {
         }
     }
 
-    // Randomly spawn new tiles
-    // Adjust spawn rate based on difficulty
-    int spawn_chance = (current_speed == SPEED_EASY) ? 35 : 
-                      (current_speed == SPEED_MEDIUM) ? 30 : 25;
-    if (rand() % spawn_chance == 0) {
+    if (rand() % ((current_speed == SPEED_EASY) ? 35 : 
+                  (current_speed == SPEED_MEDIUM) ? 30 : 25) == 0) {
         spawn_tile();
     }
 }
@@ -359,12 +368,12 @@ void check_button_presses() {
                 tiles[i].column == pressed_column && 
                 tiles[i].y >= SCREEN_HEIGHT - 2*TILE_HEIGHT) {
                 
-                score += 10;
+                score += (10 * multiplier);  // Apply multiplier to score
                 tiles[i].active = false;
                 
                 // Update score display
                 char score_str[17];
-                snprintf(score_str, 17, "Score: %d", score);
+                snprintf(score_str, 17, "Score: %d x%d", score, multiplier);
                 spi2_dma_display2(score_str);
                 break;
             }
@@ -373,71 +382,72 @@ void check_button_presses() {
 }
 
 void main_game() {
-    // Initialize display
     LCD_Setup();
     LCD_Clear(BLACK);
 
-    // Initialize OLED displays
     init_spi2();
     spi2_init_oled();
     spi2_setup_dma();
     spi2_enable_dma();
     
-    // Show mode selection screen
     spi2_dma_display1("Pick Mode:");
     spi2_dma_display2("A:Easy B:Med C:Hard");
 
-    // Wait for mode selection
     while (!game_started) {
         char key = get_key_event();
-        if (key & 0x80) {  // If it's a press event
-            key &= 0x7F;   // Remove the press flag
+        if (key & 0x80) {
+            key &= 0x7F;
             
             switch(key) {
                 case 'A':
                     current_speed = SPEED_EASY;
-                    spi2_dma_display1("Mode: Easy");
+                    lives = 3;
+                    current_tile_color = GREEN;
+                    multiplier = 10;
+                    spi2_dma_display1("Mode: Easy x10");
                     game_started = true;
                     break;
                 case 'B':
                     current_speed = SPEED_MEDIUM;
-                    spi2_dma_display1("Mode: Medium");
+                    lives = 2;
+                    current_tile_color = GREEN;
+                    multiplier = 10;
+                    spi2_dma_display1("Mode: Medium x10");
                     game_started = true;
                     break;
                 case 'C':
                     current_speed = SPEED_HARD;
-                    spi2_dma_display1("Mode: Hard");
+                    lives = 1;
+                    current_tile_color = ORANGE;
+                    multiplier = 10;
+                    spi2_dma_display1("Mode: Hard x10");
                     game_started = true;
                     break;
             }
         }
     }
 
-    // Short delay to show selected mode
-    nano_wait(1000000000);  // 1 second delay
+    nano_wait(1000000000);
 
-    // Initialize tiles
     for (int i = 0; i < NUM_TILES; i++) {
         tiles[i].active = false;
     }
 
-    // Reset game state
-    lives = 3;
     score = 0;
     game_over = false;
-    current_tile_color = GREEN;
 
-    spi2_dma_display1("Lives: 3");
-    spi2_dma_display2("Score: 0");
+    char lives_str[17];
+    snprintf(lives_str, 17, "Lives: %d x%d", lives, multiplier);
+    spi2_dma_display1(lives_str);
+    spi2_dma_display2("Score: 0 x10");
 
-    // Initialize timer for keyboard
     init_tim7();
     
     while(1) {
         if (!game_over) {
             update_screen();
             check_button_presses();
-            nano_wait(100000000); // Base delay
+            nano_wait(100000000);
         }
     }
 }
