@@ -6,6 +6,18 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+// Add this before any functions (after your #includes and other declarations)
+const int twinkle_melody[] = {
+    NOTE_C4, NOTE_C4, NOTE_G4, NOTE_G4, NOTE_A4, NOTE_A4, NOTE_G4, REST,  // Twin-kle twin-kle lit-tle star
+    NOTE_F4, NOTE_F4, NOTE_E4, NOTE_E4, NOTE_D4, NOTE_D4, NOTE_C4, REST,  // How I won-der what you are
+    NOTE_G4, NOTE_G4, NOTE_F4, NOTE_F4, NOTE_E4, NOTE_E4, NOTE_D4, REST,  // Up a-bove the world so high
+    NOTE_G4, NOTE_G4, NOTE_F4, NOTE_F4, NOTE_E4, NOTE_E4, NOTE_D4, REST,  // Like a dia-mond in the sky
+    NOTE_C4, NOTE_C4, NOTE_G4, NOTE_G4, NOTE_A4, NOTE_A4, NOTE_G4, REST,  // Twin-kle twin-kle lit-tle star
+    NOTE_F4, NOTE_F4, NOTE_E4, NOTE_E4, NOTE_D4, NOTE_D4, NOTE_C4, REST   // How I won-der what you are
+};
+
+extern const int twinkle_melody[];
+
 void set_char_msg(int, char);
 void nano_wait(unsigned int);
 void game(void);
@@ -27,7 +39,9 @@ void update_score(int val);
 void mistake(const char* mode);
 void set_tile_color(int color);
 void end_game();
-
+void init_tim1(void);
+void play_note(int frequency, int duration);
+void stop_sound(void);
 
 //===========================================================================
 // Main function
@@ -368,7 +382,7 @@ void check_button_presses() {
                 tiles[i].column == pressed_column && 
                 tiles[i].y >= SCREEN_HEIGHT - 2*TILE_HEIGHT) {
                 
-                score += (10 * multiplier);  // Apply multiplier to score
+                score += (10 * multiplier);
                 tiles[i].active = false;
                 
                 // Update score display
@@ -378,6 +392,18 @@ void check_button_presses() {
                 break;
             }
         }
+    }
+}
+
+void play_twinkle() {
+    // Note durations in milliseconds
+    const int duration = 300;  // Adjust this value to change the speed of the song
+    const int pause = 100;     // Short pause between notes
+    
+    for(int i = 0; i < sizeof(twinkle_melody)/sizeof(twinkle_melody[0]); i++) {
+        play_note(twinkle_melody[i], duration);
+        nano_wait(pause * 1000000); // Short pause between notes
+        stop_sound();
     }
 }
 
@@ -443,11 +469,26 @@ void main_game() {
 
     init_tim7();
     
+    // Add a variable to track when to play the next note
+    int current_note = 0;
+    int note_timer = 0;
+    
     while(1) {
         if (!game_over) {
             update_screen();
             check_button_presses();
-            nano_wait(100000000);
+            
+            // Play the next note of the song with improved timing
+            if (note_timer == 0) {
+                play_note(twinkle_melody[current_note], 300);  // Increased duration to 300ms
+                current_note = (current_note + 1) % (sizeof(twinkle_melody)/sizeof(twinkle_melody[0]));
+                note_timer = 40;  // Adjusted for better rhythm
+            }
+            note_timer--;
+            
+            nano_wait(50000000);  // Reduced wait time for smoother playback
+        } else {
+            stop_sound();
         }
     }
 }
@@ -460,6 +501,7 @@ int main() {
     internal_clock();
     enable_ports();
     init_tim7(); // setup keyboard
+    init_tim1(); // setup sound
 
     init_usart5();
     enable_tty_interrupt();
@@ -470,3 +512,41 @@ int main() {
     main_game();
 }
 #endif
+
+// Add these new functions
+void init_tim1(void) {
+    // Enable GPIOA clock
+    RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
+    
+    // Configure PA8 for alternate function (TIM1_CH1)
+    GPIOA->MODER &= ~GPIO_MODER_MODER8;
+    GPIOA->MODER |= GPIO_MODER_MODER8_1;
+    GPIOA->AFR[1] |= (2 << ((8-8) * 4));  // AF2 for TIM1_CH1
+    
+    // Enable TIM1 clock
+    RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
+    
+    // Configure TIM1
+    TIM1->PSC = 0;
+    TIM1->ARR = 48000000/NOTE_C4;  // Default to C4 frequency
+    TIM1->CCMR1 = TIM_CCMR1_OC1M_1 | TIM_CCMR1_OC1M_2; // PWM mode 1
+    TIM1->CCER = TIM_CCER_CC1E;    // Enable output
+    TIM1->BDTR |= TIM_BDTR_MOE;    // Main output enable
+    TIM1->CCR1 = TIM1->ARR / 2;    // 50% duty cycle
+}
+
+void play_note(int frequency, int duration) {
+    if (frequency == 0) {
+        TIM1->CR1 &= ~TIM_CR1_CEN;  // Stop timer
+        return;
+    }
+    
+    TIM1->ARR = 48000000/frequency;  // Set frequency
+    TIM1->CCR1 = TIM1->ARR / 2;     // 50% duty cycle
+    TIM1->CR1 |= TIM_CR1_CEN;       // Start timer
+    nano_wait(duration * 1000000);   // Wait for note duration
+}
+
+void stop_sound(void) {
+    TIM1->CR1 &= ~TIM_CR1_CEN;  // Stop timer
+}

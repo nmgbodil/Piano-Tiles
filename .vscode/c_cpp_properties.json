@@ -8,8 +8,8 @@
         {
             "name": "PlatformIO",
             "includePath": [
-                "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/362-Piano-Tiles/include",
-                "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/362-Piano-Tiles/src",
+                "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/include",
+                "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/src",
                 "/Users/gabrielogbalor/.platformio/packages/framework-cmsis/CMSIS/Include",
                 "/Users/gabrielogbalor/.platformio/packages/framework-cmsis-stm32f0/Include",
                 ""
@@ -17,8 +17,8 @@
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,
                 "path": [
-                    "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/362-Piano-Tiles/include",
-                    "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/362-Piano-Tiles/src",
+                    "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/include",
+                    "/Users/gabrielogbalor/Documents/ECE 36200/362-Piano-Tiles/src",
                     "/Users/gabrielogbalor/.platformio/packages/framework-cmsis/CMSIS/Include",
                     "/Users/gabrielogbalor/.platformio/packages/framework-cmsis-stm32f0/Include",
                     ""
